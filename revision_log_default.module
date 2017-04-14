@@ -1,0 +1,68 @@
+<?php
+
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\ContentEntityInterface;
+
+/**
+ * Implements hook_entity_presave().
+ */
+function revision_log_default_entity_presave(EntityInterface $entity) {
+  if ($entity instanceof ContentEntityInterface) {
+    if (isset($entity->revision_log) && empty($entity->revision_log->getString())) {
+      $original = $entity->original;
+      // Use the current timestamp if the revision_timestamp is the same as its
+      // original value (often happens with custom code, REST, and Quick Edit).
+      if (($original && $entity->revision_timestamp->equals($original->revision_timestamp)) || empty($entity->revision_timestamp->getString())) {
+        $entity->revision_timestamp = time();
+      }
+      if ($entity->isNew()) {
+        $bundle_type = $entity->getEntityType()->getBundleEntityType();
+        $bundle = \Drupal::entityTypeManager()
+          ->getStorage($bundle_type)
+          ->load($entity->bundle());
+        $entity->revision_log = t('Created new @bundle', [
+          '@bundle' => $bundle->label()
+        ]);
+      }
+      else if ($entity->isNewTranslation()) {
+        $entity->revision_log = t('Created @language translation', [
+          '@language' => $entity->language()->getName()
+        ]);
+      }
+      else {
+        $changed_fields = [];
+        $ignore = [
+          'changed',
+          'revision_log',
+          'vid',
+          'revision_timestamp',
+          'revision_translation_affected',
+        ];
+        /** @var \Drupal\Core\Entity\ContentEntityInterface $original */
+        /** @var \Drupal\Core\Field\FieldItemListInterface $field_items */
+        foreach ($entity as $field_name => $field_items) {
+          if (in_array($field_name, $ignore, TRUE)) {
+            continue;
+          }
+          if (!$original->hasField($field_name) || !$field_items->equals($original->get($field_name))) {
+            $changed_fields[] = $field_items->getDataDefinition()->getLabel();
+          }
+        }
+        if (!empty($changed_fields)) {
+          if (count($changed_fields) <= 2) {
+            $entity->revision_log = \Drupal::translation()->formatPlural(count($changed_fields),'Updated the @fields field', 'Updated the @fields fields', [
+              '@fields' => implode(' and ', $changed_fields),
+            ]);
+          }
+          else {
+            $last_field = array_pop($changed_fields);
+            $entity->revision_log = t('Updated the @fields, and @last_field fields', [
+              '@fields' => implode(', ', $changed_fields),
+              '@last_field' => $last_field,
+            ]);
+          }
+        }
+      }
+    }
+  }
+}
