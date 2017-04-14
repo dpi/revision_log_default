@@ -37,6 +37,11 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
           'vid',
           'revision_timestamp',
           'revision_translation_affected',
+          'revision_uid',
+          // @todo Figure out how to support these properly when using content/
+          // workbench_moderation.
+          'status',
+          'moderation_state',
         ];
         /** @var \Drupal\Core\Entity\ContentEntityInterface $original */
         /** @var \Drupal\Core\Field\FieldItemListInterface $field_items */
