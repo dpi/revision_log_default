@@ -93,10 +93,11 @@ function _revision_log_default_get_original(ContentEntityInterface $entity) {
     $is_moderated = $information->isModeratableEntity($entity);
   }
   if ($is_moderated) {
-    $latest_translation = $information
+    $latest = $information
       ->getLatestRevision($entity->getEntityTypeId(), $entity->id());
-    if ($latest_translation) {
-      $original = $latest_translation->getTranslation($entity->language()->getId());
+    $langcode = $entity->language()->getId();
+    if ($latest && $latest->hasTranslation($langcode)) {
+      $original = $latest->getTranslation($langcode);
     }
   }
   return isset($original) ? $original : $entity->original;
