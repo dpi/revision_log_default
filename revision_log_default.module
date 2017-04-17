@@ -9,7 +9,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
 function revision_log_default_entity_presave(EntityInterface $entity) {
   if ($entity instanceof ContentEntityInterface) {
     if (isset($entity->revision_log) && empty($entity->revision_log->getString())) {
-      $original = $entity->original;
+      $original = _revision_log_default_get_original($entity);
       // Use the current timestamp if the revision_timestamp is the same as its
       // original value (often happens with custom code, REST, and Quick Edit).
       if (($original && $entity->revision_timestamp->equals($original->revision_timestamp)) || empty($entity->revision_timestamp->getString())) {
@@ -38,10 +38,6 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
           'revision_timestamp',
           'revision_translation_affected',
           'revision_uid',
-          // @todo Figure out how to support these properly when using content/
-          // workbench_moderation.
-          'status',
-          'moderation_state',
         ];
         /** @var \Drupal\Core\Entity\ContentEntityInterface $original */
         /** @var \Drupal\Core\Field\FieldItemListInterface $field_items */
@@ -70,4 +66,37 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
       }
     }
   }
+}
+
+/**
+ * Gets the original entity for an entity about to be saved.
+ *
+ * @param \Drupal\Core\Entity\ContentEntityInterface $entity
+ *   The entity that is about to be saved.
+ *
+ * @return \Drupal\Core\Entity\ContentEntityInterface
+ *   The original entity.
+ */
+function _revision_log_default_get_original(ContentEntityInterface $entity) {
+  // If the entity uses Moderation, load the latest revision as the original.
+  // @todo File a core issue for this?
+  $handler = \Drupal::moduleHandler();
+  $is_moderated = FALSE;
+  if ($handler->moduleExists('content_moderation')) {
+    /** @var \Drupal\content_moderation\ModerationInformation $information */
+    $information = \Drupal::service('content_moderation.moderation_information');
+    $is_moderated = $information->isModeratedEntity($entity);
+  }
+  else if ($handler->moduleExists('workbench_moderation')) {
+    /** @var \Drupal\workbench_moderation\ModerationInformation $information */
+    $information = \Drupal::service('workbench_moderation.moderation_information');
+    $is_moderated = $information->isModeratableEntity($entity);
+  }
+  if ($is_moderated) {
+    $original = $information->getLatestRevision($entity->getEntityTypeId(), $entity->id());
+  }
+  else {
+    $original = $entity->original;
+  }
+  return $original;
 }
