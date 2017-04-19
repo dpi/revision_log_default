@@ -15,6 +15,9 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
       if (($original && $entity->revision_timestamp->equals($original->revision_timestamp)) || empty($entity->revision_timestamp->getString())) {
         $entity->revision_timestamp = time();
       }
+      // The revision UID is not always set correctly, especially when using
+      // the API or command line to update entities.
+      $entity->revision_uid = \Drupal::currentUser()->id();
       if ($entity->isNew()) {
         $bundle_type = $entity->getEntityType()->getBundleEntityType();
         $bundle = \Drupal::entityTypeManager()
@@ -42,7 +45,7 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
         /** @var \Drupal\Core\Entity\ContentEntityInterface $original */
         /** @var \Drupal\Core\Field\FieldItemListInterface $field_items */
         foreach ($entity as $field_name => $field_items) {
-          if (in_array($field_name, $ignore, TRUE)) {
+          if (in_array($field_name, $ignore, TRUE) || ($field_name === 'path' && !empty($entity->path->pathauto))) {
             continue;
           }
           if (!$original->hasField($field_name) || !$field_items->equals($original->get($field_name))) {
