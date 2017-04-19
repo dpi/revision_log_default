@@ -7,7 +7,7 @@ use Drupal\Core\Entity\ContentEntityInterface;
  * Implements hook_entity_presave().
  */
 function revision_log_default_entity_presave(EntityInterface $entity) {
-  if ($entity instanceof ContentEntityInterface) {
+  if ($entity instanceof ContentEntityInterface && $entity->getEntityTypeId() === 'node') {
     if (isset($entity->revision_log) && empty($entity->revision_log->getString())) {
       $original = _revision_log_default_get_original($entity);
       // Use the current timestamp if the revision_timestamp is the same as its
