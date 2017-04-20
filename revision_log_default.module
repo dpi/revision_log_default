@@ -11,14 +11,15 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
   if ($entity instanceof ContentEntityInterface && $entity instanceof RevisionLogInterface) {
     if (empty($entity->getRevisionLogMessage())) {
       $original = _revision_log_default_get_original($entity);
-      if ($bundle_type = $entity->getEntityType()->getBundleEntityType()) {
+      $entity_type = $entity->getEntityType();
+      if ($bundle_type = $entity_type->getBundleEntityType()) {
         $bundle = \Drupal::entityTypeManager()
           ->getStorage($bundle_type)
           ->load($entity->bundle());
         $label = $bundle->label();
       }
       else {
-        $label = $entity->getEntityType()->getLabel();
+        $label = $entity_type->getLabel();
       }
       // Use the current timestamp if the revision_timestamp is the same as its
       // original value (often happens with custom code, REST, and Quick Edit).
@@ -46,9 +47,10 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
       }
       else {
         $changed_fields = [];
+        $ignore = ['changed', $entity_type->getKey('revision')];
         /** @var \Drupal\Core\Field\FieldItemListInterface $field_items */
         foreach ($entity as $field_name => $field_items) {
-          if (in_array($field_name, ['changed', 'vid'], TRUE) || strpos($field_name, 'revision') !== FALSE || ($field_name === 'path' && !empty($entity->path->pathauto))) {
+          if (in_array($field_name, $ignore, TRUE) || strpos($field_name, 'revision') !== FALSE || ($field_name === 'path' && !empty($entity->path->pathauto))) {
             continue;
           }
           if (!$original->hasField($field_name) || !$field_items->equals($original->get($field_name))) {
