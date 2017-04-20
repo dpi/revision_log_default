@@ -2,50 +2,53 @@
 
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\RevisionLogInterface;
 
 /**
  * Implements hook_entity_presave().
  */
 function revision_log_default_entity_presave(EntityInterface $entity) {
-  if ($entity instanceof ContentEntityInterface && $entity->getEntityTypeId() === 'node') {
-    if (isset($entity->revision_log) && empty($entity->revision_log->getString())) {
+  if ($entity instanceof ContentEntityInterface && $entity instanceof RevisionLogInterface) {
+    if (empty($entity->getRevisionLogMessage())) {
       $original = _revision_log_default_get_original($entity);
-      // Use the current timestamp if the revision_timestamp is the same as its
-      // original value (often happens with custom code, REST, and Quick Edit).
-      if (($original && $entity->revision_timestamp->equals($original->revision_timestamp)) || empty($entity->revision_timestamp->getString())) {
-        $entity->revision_timestamp = time();
-      }
-      // The revision UID is not always set correctly, especially when using
-      // the API or command line to update entities.
-      $entity->revision_uid = \Drupal::currentUser()->id();
-      if ($entity->isNew()) {
-        $bundle_type = $entity->getEntityType()->getBundleEntityType();
+      if ($bundle_type = $entity->getEntityType()->getBundleEntityType()) {
         $bundle = \Drupal::entityTypeManager()
           ->getStorage($bundle_type)
           ->load($entity->bundle());
-        $entity->revision_log = t('Created new @bundle', [
-          '@bundle' => $bundle->label()
-        ]);
+        $label = $bundle->label();
+      }
+      else {
+        $label = $entity->getEntityType()->getLabel();
+      }
+      // Use the current timestamp if the revision_timestamp is the same as its
+      // original value (often happens with custom code, REST, and Quick Edit).
+      if (($original && $entity->getRevisionCreationTime() === $original->getRevisionCreationTime()) || empty($entity->getRevisionCreationTime())) {
+        $entity->setRevisionCreationTime(\Drupal::time()->getRequestTime());
+      }
+      // The revision UID is not always set correctly, in particular when using
+      // the command line or when running migrations.
+      $current_user_id = \Drupal::currentUser()->id();
+      if ($current_user_id === 0 && method_exists($entity, 'getOwnerId')) {
+        $entity->setRevisionUserId($entity->getOwnerId());
+      }
+      else {
+        $entity->setRevisionUserId($current_user_id);
+      }
+      if ($entity->isNew()) {
+        $entity->setRevisionLogMessage(t('Created new @label', [
+          '@label' => $label,
+        ]));
       }
       else if ($entity->isNewTranslation()) {
-        $entity->revision_log = t('Created @language translation', [
+        $entity->setRevisionLogMessage(t('Created @language translation', [
           '@language' => $entity->language()->getName()
-        ]);
+        ]));
       }
       else {
         $changed_fields = [];
-        $ignore = [
-          'changed',
-          'revision_log',
-          'vid',
-          'revision_timestamp',
-          'revision_translation_affected',
-          'revision_uid',
-        ];
-        /** @var \Drupal\Core\Entity\ContentEntityInterface $original */
         /** @var \Drupal\Core\Field\FieldItemListInterface $field_items */
         foreach ($entity as $field_name => $field_items) {
-          if (in_array($field_name, $ignore, TRUE) || ($field_name === 'path' && !empty($entity->path->pathauto))) {
+          if (in_array($field_name, ['changed', 'vid'], TRUE) || strpos($field_name, 'revision') !== FALSE || ($field_name === 'path' && !empty($entity->path->pathauto))) {
             continue;
           }
           if (!$original->hasField($field_name) || !$field_items->equals($original->get($field_name))) {
@@ -54,17 +57,22 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
         }
         if (!empty($changed_fields)) {
           if (count($changed_fields) <= 2) {
-            $entity->revision_log = \Drupal::translation()->formatPlural(count($changed_fields),'Updated the @fields field', 'Updated the @fields fields', [
+            $entity->setRevisionLogMessage(\Drupal::translation()->formatPlural(count($changed_fields),'Updated the @fields field', 'Updated the @fields fields', [
               '@fields' => implode(' and ', $changed_fields),
-            ]);
+            ]));
           }
           else {
             $last_field = array_pop($changed_fields);
-            $entity->revision_log = t('Updated the @fields, and @last_field fields', [
+            $entity->setRevisionLogMessage(t('Updated the @fields, and @last_field fields', [
               '@fields' => implode(', ', $changed_fields),
               '@last_field' => $last_field,
-            ]);
+            ]));
           }
+        }
+        else {
+          $entity->setRevisionLogMessage(t('Updated @label', [
+            '@label' => $label,
+          ]));
         }
       }
     }
@@ -82,7 +90,8 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
  */
 function _revision_log_default_get_original(ContentEntityInterface $entity) {
   // If the entity uses Moderation, load the latest revision as the original.
-  // @todo File a core issue for this?
+  // This could be brought into core, but do users expect ->original to be the
+  // default revision or the last revision? It's complicated!
   $handler = \Drupal::moduleHandler();
   $is_moderated = FALSE;
   if ($handler->moduleExists('content_moderation')) {
@@ -100,8 +109,8 @@ function _revision_log_default_get_original(ContentEntityInterface $entity) {
       ->getLatestRevision($entity->getEntityTypeId(), $entity->id());
     $langcode = $entity->language()->getId();
     if ($latest && $latest->hasTranslation($langcode)) {
-      $original = $latest->getTranslation($langcode);
+      return $latest->getTranslation($langcode);
     }
   }
-  return isset($original) ? $original : $entity->original;
+  return $entity->original;
 }
