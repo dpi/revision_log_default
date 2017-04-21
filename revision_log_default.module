@@ -50,7 +50,7 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
         $ignore = ['changed', $entity_type->getKey('revision')];
         /** @var \Drupal\Core\Field\FieldItemListInterface $field_items */
         foreach ($entity as $field_name => $field_items) {
-          if (in_array($field_name, $ignore, TRUE) || strpos($field_name, 'revision') !== FALSE || ($field_name === 'path' && !empty($entity->path->pathauto))) {
+          if (in_array($field_name, $ignore, TRUE) || strpos($field_name, 'revision') !== FALSE || ($field_name === 'path' && isset($entity->path->pathauto))) {
             continue;
           }
           if (!$original->hasField($field_name) || !$field_items->equals($original->get($field_name))) {
