@@ -7,7 +7,6 @@ use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\Node;
 use Drupal\node\Entity\NodeType;
 
-
 /**
  * Tests the revision_log_default module.
  *

@@ -1,5 +1,9 @@
 <?php
 
+/**
+ * @file Contains hook implementations for the revision_log_default module.
+ */
+
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\RevisionLogInterface;
@@ -40,9 +44,9 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
           '@label' => $label,
         ]));
       }
-      else if ($entity->isNewTranslation()) {
+      elseif ($entity->isNewTranslation()) {
         $entity->setRevisionLogMessage(t('Created @language translation', [
-          '@language' => $entity->language()->getName()
+          '@language' => $entity->language()->getName(),
         ]));
       }
       else {
@@ -59,7 +63,7 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
         }
         if (!empty($changed_fields)) {
           if (count($changed_fields) <= 2) {
-            $entity->setRevisionLogMessage(\Drupal::translation()->formatPlural(count($changed_fields),'Updated the @fields field', 'Updated the @fields fields', [
+            $entity->setRevisionLogMessage(\Drupal::translation()->formatPlural(count($changed_fields), 'Updated the @fields field', 'Updated the @fields fields', [
               '@fields' => implode(' and ', $changed_fields),
             ]));
           }
@@ -101,7 +105,7 @@ function _revision_log_default_get_original(ContentEntityInterface $entity) {
     $information = \Drupal::service('content_moderation.moderation_information');
     $is_moderated = $information->isModeratedEntity($entity);
   }
-  else if ($handler->moduleExists('workbench_moderation')) {
+  elseif ($handler->moduleExists('workbench_moderation')) {
     /** @var \Drupal\workbench_moderation\ModerationInformation $information */
     $information = \Drupal::service('workbench_moderation.moderation_information');
     $is_moderated = $information->isModeratableEntity($entity);
