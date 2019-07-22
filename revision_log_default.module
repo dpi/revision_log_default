@@ -20,9 +20,12 @@ function revision_log_default_entity_presave(EntityInterface $entity) {
         $bundle = \Drupal::entityTypeManager()
           ->getStorage($bundle_type)
           ->load($entity->bundle());
-        $label = $bundle->label();
+        if ($bundle instanceof EntityInterface) {
+          $label = $bundle->label();
+        }
       }
-      else {
+      // Fall back to entity type label if not bundle-able or bundle is missing.
+      if (!isset($label)) {
         $label = $entity_type->getLabel();
       }
       // Use the current timestamp if the revision_timestamp is the same as its
